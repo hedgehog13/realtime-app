@@ -99,7 +99,7 @@ app.get('/home', (req, res) => {
         res.json( req.session.passport.user);
     } else {
         console.log('else')
-        res.json({res: 'start'})
+        res.json({res: 'error'})
         //  res.send('<html><head><title>Twitch Auth Sample</title></head><a href="/auth/twitch"><img src="http://ttv-api.s3.amazonaws.com/assets/connect_dark.png"></a></html>');
     }
 });

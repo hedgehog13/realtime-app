@@ -27,9 +27,12 @@ export class AppComponent implements OnInit {
     this.http.get(`${environment.apiUrl}home`, httpOptions)
       .subscribe(res => {
         console.log(res);
-        localStorage.setItem('accesstoken', res['accessToken']);
+        if(res['res']!=='error'){
+          localStorage.setItem('accesstoken', res['accessToken']);
 
-        this.imgSrc = res['data'][0].profile_image_url;
+          this.imgSrc = res['data'][0].profile_image_url;
+        }
+
        // this.ssocket.connect();
 
       })
