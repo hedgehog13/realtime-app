@@ -1,0 +1,158 @@
+const express = require('express');
+const session = require('express-session');
+const passport = require('passport');
+const OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
+const request = require('request');
+const axios = require('axios');
+
+// Define our constants, you will change these with your own
+const TWITCH_CLIENT_ID = 'bnovmkukib4m30y39t9w03tnu34jxe';
+const TWITCH_SECRET = '2w698wvvbqfdrpd8l31oz8jo9xrtns';
+const SESSION_SECRET = 'some_secret';
+const CALLBACK_URL = 'http://localhost:8000/auth/twitch/callback';  // You can run locally with
+
+
+// Initialize Express and middlewares
+const app = express();
+app.use(session({secret: SESSION_SECRET, resave: false, saveUninitialized: false}));
+app.use(express.static('../client/dist/client'));
+
+app.use(passport.initialize({}));
+app.use(passport.session({}));
+
+app.all("/*", (req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+    next();
+});
+
+
+app.listen(8000, function () {
+    console.log('Twitch auth sample listening on port 8000!')
+});
+
+
+// Override passport profile function to get user profile from Twitch API
+OAuth2Strategy.prototype.userProfile = (accessToken, done) => {
+
+
+    const options = {
+        url: 'https://api.twitch.tv/helix/users',
+        method: 'GET',
+        headers: {
+            'Client-ID': TWITCH_CLIENT_ID,
+            'Accept': 'application/vnd.twitchtv.v5+json',
+            'Authorization': 'Bearer ' + accessToken
+        }
+    };
+
+    request(options, (error, response, body) => {
+        if (response && response.statusCode == 200) {
+            done(null, JSON.parse(body));
+
+        } else {
+            done(JSON.parse(body));
+        }
+    });
+};
+
+passport.serializeUser((user, done) => {
+    done(null, user);
+});
+
+passport.deserializeUser((user, done) => {
+    done(null, user);
+});
+// https://id.twitch.tv/oauth2/token
+
+
+async function getGameData(newCursor, accessToken, counter) {
+    const options = {
+        method: 'GET',
+        headers: {
+            'Client-ID': TWITCH_CLIENT_ID,
+            'Authorization': 'Bearer ' + accessToken
+        }
+    };
+    const url = `https://api.twitch.tv/helix/streams?game_id=460630&after=${newCursor}`;
+    try {
+        const response = await axios.get(url, options);
+        counter += response.data.data.reduce((prev, cur) => prev + cur.viewer_count, 0);
+        if (response.data.pagination.cursor) {
+            return getGameData(response.data.pagination.cursor, accessToken, counter);
+        }
+        return counter;
+
+    } catch (error) {
+        console.error(error);
+    }
+
+
+}
+
+
+// const sleep = time => new Promise(resolve => setTimeout(resolve, time));
+// const poll = (promiseFn, time) => promiseFn()
+//     .then(
+//         sleep(time)
+//             .then(() => poll(promiseFn, time)));
+
+
+passport.use('twitch', new OAuth2Strategy({
+        authorizationURL: 'https://id.twitch.tv/oauth2/authorize',
+        tokenURL: 'https://id.twitch.tv/oauth2/token',
+        clientID: TWITCH_CLIENT_ID,
+        clientSecret: TWITCH_SECRET,
+        callbackURL: CALLBACK_URL,
+        state: true
+    },
+    (accessToken, refreshToken, profile, done) => {
+        profile.accessToken = accessToken;
+        profile.refreshToken = refreshToken;
+        done(accessToken);
+    }
+));
+
+// Set route to start OAuth link, this is where you define scopes to request
+app.get('/auth/twitch', passport.authenticate('twitch', {scope: 'user_read'}));
+
+// Set route for OAuth redirect
+// app.get('/auth/twitch/callback', passport.authenticate('twitch', (token) => {
+//     console.log('i am here', token);
+//         if (token) {
+//             console.log("*****************************************************");
+//             // getGameData('', token, 0).then((res) => console.log(res))
+//             pollfiveminuts(token)
+//         }
+//
+//     })
+// );
+app.get('/auth/twitch/callback', passport.authenticate('twitch', {
+    successRedirect: 'back',
+    failureRedirect: '/'
+}));
+app.get('/back',  (req, res)=> {
+    console.log('here')
+    console.log('simpleget:', req.session);
+    // if(req.session && req.session.passport && req.session.passport.user) {
+    //     res.send(template(req.session.passport.user));
+    // } else {
+    //     res.send('<html><head><title>Twitch Auth Sample</title></head><a href="/auth/twitch"><img src="http://ttv-api.s3.amazonaws.com/assets/connect_dark.png"></a></html>');
+    // }
+});
+
+// async function pollfiveminuts(token) {
+//
+//     //if (req.session && req.session.passport && req.session.passport.user)
+//         const res = await getGameData('', token, 0);
+//
+//     setTimeout(() => {
+//       //  console.log('pollfiveminuts token', token);
+//         if (token) {
+//             pollfiveminuts(token);
+//         }
+//
+//     }, 300000);
+//   //  console.log(res);
+// }

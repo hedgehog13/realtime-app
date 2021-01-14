@@ -1,41 +1,46 @@
 import {Component, OnInit} from '@angular/core';
-import {HttpClient, HttpHeaders} from "@angular/common/http";
-import {environment} from "../environments/environment";
-import {map} from "rxjs/operators";
-import {WebsocketService} from "./websocket.service";
 
+import {WebsocketService} from "./websocket.service";
+import {AuthenticationService} from "./services/authentication.service";
+import {ActivatedRoute, Router} from "@angular/router";
+
+const TWITCH_CLIENT_ID = 'bnovmkukib4m30y39t9w03tnu34jxe';
+const TWITCH_SECRET = '2w698wvvbqfdrpd8l31oz8jo9xrtns';
+const SESSION_SECRET = 'some_secret';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
+
+
 export class AppComponent implements OnInit {
-  title = 'client';
-  httpOptions = {headers: new HttpHeaders({'Content-Type': 'application/json'})};
+
+  code;
+  code_url = `https://id.twitch.tv/oauth2/authorize?response_type=code&client_id=${TWITCH_CLIENT_ID}&redirect_uri=http://localhost:4200/`;
+  res;
+
+  constructor(private socketService: WebsocketService,
+              private authService: AuthenticationService,
+              private route: ActivatedRoute,
+              private router: Router) {
 
 
-  imgSrc;
-
-  constructor(private http: HttpClient, ) {
-
-    console.log(document.location.hash)
   }
 
   ngOnInit(): void {
-    const httpOptions = {headers: new HttpHeaders({'Content-Type': 'application/json'})};
-    this.http.get(`${environment.apiUrl}home`, httpOptions)
-      .subscribe(res => {
-        console.log(res);
-        if(res['res']!=='error'){
-          localStorage.setItem('accesstoken', res['accessToken']);
 
-          this.imgSrc = res['data'][0].profile_image_url;
-        }
-
-       // this.ssocket.connect();
-
-      })
-    // }
+    this.route.queryParams.subscribe(params => {
+      const code = params['code'];
+      if (code) {
+        console.log(code);
+        this.authService.login(code).subscribe(res => {
+        //  console.log(res);
+          this.router.navigate(['/home'],  { relativeTo: this.route })
+        });
+        // this.res = this.socketService.counter;
+      }
+    });
   }
 }
