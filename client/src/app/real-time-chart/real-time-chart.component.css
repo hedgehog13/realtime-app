@@ -1,0 +1,16 @@
+#chart {
+  max-width: 600px;
+  max-height: 400px;
+}
+.line1{
+  stroke:red;
+  fill: none;
+}
+.line2{
+  stroke:green;
+  fill: none;
+}
+.line3{
+  strok:yellow;
+  fill:none
+}
