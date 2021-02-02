@@ -1,25 +1,26 @@
 const express = require('express');
 const session = require('express-session');
-const passport = require('passport');
-const OAuth2Strategy = require('passport-oauth').OAuth2Strategy;
-const request = require('request');
-const handlebars = require('handlebars');
-
-
-// Define our constants, you will change these with your own
+const cors = require('cors');
+const axios = require('axios');
+const moment = require('moment');
 const TWITCH_CLIENT_ID = 'bnovmkukib4m30y39t9w03tnu34jxe';
 const TWITCH_SECRET = '2w698wvvbqfdrpd8l31oz8jo9xrtns';
-const SESSION_SECRET = 'some_secret>';
-const CALLBACK_URL = 'http://localhost:8000/auth/twitch/callback';  // You can run locally with
-// - http://localhost:3000/auth/twitch/callback
+const SESSION_SECRET = 'some_secret';
+const CALLBACK_URL = 'http://localhost:8000/auth/twitch/callback';
+
 
 // Initialize Express and middlewares
-const app = express();
-app.use(session({secret: SESSION_SECRET, resave: false, saveUninitialized: false}));
-app.use(express.static('../client/dist/client'));
-//app.use(express.static('public'));
-app.use(passport.initialize());
-app.use(passport.session());
+const app = require('express')();
+
+
+app.use(cors());
+app.use(session({
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: true,
+    cookie: {"httpOnly": false, secure: false, maxAge: 36000000}
+}));
+app.use(express.static('../client/dist/client/'));
 
 app.all("/*", (req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -28,79 +29,120 @@ app.all("/*", (req, res, next) => {
     next();
 });
 
+const http = app.listen(8000,
+    () => {
+        console.log('started on port 8000');
+        axios.post('http://localhost:8000/auth/twitch').catch(error => console.log('auth error', error));
+    });
 
-app.listen(8000, function () {
-    console.log('Twitch auth sample listening on port 8000!')
+const io = require('socket.io')(http, {
+    cors: {
+        origin: "http://localhost:4200",
+        methods: ["GET", "POST"]
+    }
 });
+app.post(CALLBACK_URL, (req, res) => {
+    console.log(1)
+})
+app.post('/auth/twitch',
+    (req, res) => {
+        const url_post = `https://id.twitch.tv/oauth2/token?client_id=${TWITCH_CLIENT_ID}&client_secret=${TWITCH_SECRET}&grant_type=client_credentials`;
+        axios.post(url_post)
+            .then(async result => {
+                const token = result.data.access_token;
+                const games_array = await getGames(token);
+                const counter_game = games_array.find(a => a.name === 'Tom Clancy\'s Rainbow Six Siege');
+                console.log(counter_game);
+                getCounter(token, counter_game).catch(err => {
+                    console.log('getCounter', err);
+                });
 
+                getCounterForChart(games_array, token)
+                    .catch(error => console.log('getCounterForChart', error));
+            });
 
-// Override passport profile function to get user profile from Twitch API
-OAuth2Strategy.prototype.userProfile = function (accessToken, done) {
+    }
+);
+
+async function getGames(accessToken) {
     const options = {
-        url: 'https://api.twitch.tv/helix/users',
         method: 'GET',
         headers: {
             'Client-ID': TWITCH_CLIENT_ID,
-            'Accept': 'application/vnd.twitchtv.v5+json',
+            'Authorization': 'Bearer ' + accessToken
+        }
+    };
+    // let games_array;
+    const url = encodeURI('https://api.twitch.tv/helix/games?name=Rainbow Six Siege&name=Far Cry 5&name=Assassin\'s Creed: Odyssey');
+    return (await axios.get(url, options)).data.data;
+}
+
+async function getCounter(token, game_data) {
+
+    let result = await getGameData('', token, 0, game_data);
+    if (result && token) getCounter(token, game_data).catch(err => console.log(err));
+
+    io.sockets.emit('getCounter', result);
+    // return result;
+
+}
+
+async function getCounterForChart(array_games, accessToken) {
+    let result;
+    let testArray = array_games.filter(a => a.name !== 'Tom Clancy\'s Rainbow Six Siege');
+    //console.log('AAAAAAA', array_games)
+    for (let i = 0; i < array_games.length; i++) {
+      //  console.log('***************',array_games[i]);
+        result = await getGameData('', accessToken, 0, array_games[i]);
+         result.date = new Date();
+     //   console.log('***************', result);
+
+         io.sockets.emit('getCounterForChart', result);
+    }
+    if (result && accessToken) {
+
+        getCounterForChart(array_games, accessToken).catch(err => console.log(err));
+
+    }
+}
+
+async function getGameData(newCursor, accessToken, counter, game_data) {
+
+    const options = {
+        method: 'GET',
+        headers: {
+            'Client-ID': TWITCH_CLIENT_ID,
             'Authorization': 'Bearer ' + accessToken
         }
     };
 
-    request(options, function (error, response, body) {
-        if (response && response.statusCode == 200) {
-            done(null, JSON.parse(body));
-        } else {
-            done(JSON.parse(body));
+    const url = `https://api.twitch.tv/helix/streams?first=100&game_id=${game_data.id}&after=${newCursor}`;
+    try {
+
+        const response = await axios.get(url, options).catch(err => console.log('getGameData ERROR', err));
+        counter += response.data.data.reduce((prev, cur) => prev + cur.viewer_count, 0);
+        const remaining = response.headers['ratelimit-remaining'];
+        if (remaining < 3) {
+            return;
         }
+        if (response && remaining > 0 && response.data.pagination.cursor) {
+            return getGameData(response.data.pagination.cursor, accessToken, counter, game_data);
+        }
+        return {counter: counter, game_data: game_data};
+
+    } catch (error) {
+        console.error(error);
+    }
+
+}
+
+
+io.on('connection', (socket) => {
+
+    console.log("User Connected");
+   // axios.post('http://localhost:8000/auth/twitch').catch(error => console.log('auth error', error));
+    socket.on('disconnect', (msg) => {
+        console.log("User DisConnected");
     });
-};
 
-passport.serializeUser(function (user, done) {
-    done(null, user);
 });
-
-passport.deserializeUser(function (user, done) {
-    done(null, user);
-});
-
-passport.use('twitch', new OAuth2Strategy({
-        authorizationURL: 'https://id.twitch.tv/oauth2/authorize',
-        tokenURL: 'https://id.twitch.tv/oauth2/token',
-        clientID: TWITCH_CLIENT_ID,
-        clientSecret: TWITCH_SECRET,
-        callbackURL: CALLBACK_URL,
-        state: true
-    },
-    function (accessToken, refreshToken, profile, done) {
-        profile.accessToken = accessToken;
-        profile.refreshToken = refreshToken;
-
-        // Securely store user profile in your DB
-        //User.findOrCreate(..., function(err, user) {
-        //  done(err, user);
-        //});
-
-        done(null, profile);
-    }
-));
-
-// Set route to start OAuth link, this is where you define scopes to request
-app.get('/auth/twitch', passport.authenticate('twitch', {scope: 'user_read'}));
-
-// Set route for OAuth redirect
-app.get('/auth/twitch/callback', passport.authenticate('twitch',
-    {successRedirect: '/', failureRedirect: '/'}));
-// //
-//
-app.get('/home', (req, res) => {
-    console.log('i\'m here!!')
-    if (req.session && req.session.passport && req.session.passport.user) {
-        console.log('i\'m in!!');
-        res.json( req.session.passport.user);
-    } else {
-        console.log('else')
-        res.json({res: 'error'})
-        //  res.send('<html><head><title>Twitch Auth Sample</title></head><a href="/auth/twitch"><img src="http://ttv-api.s3.amazonaws.com/assets/connect_dark.png"></a></html>');
-    }
-});
-

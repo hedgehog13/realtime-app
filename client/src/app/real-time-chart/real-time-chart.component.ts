@@ -10,7 +10,7 @@ import {
 
 
 import * as d3 from 'd3';
-
+import * as d3Scale from 'd3-scale';
 
 import {NgxChartsModule} from '@swimlane/ngx-charts';
 
@@ -39,7 +39,7 @@ export class RealTimeChartComponent implements OnInit {
   // Set the dimensions of the canvas / graph
   margin = {top: 30, right: 20, bottom: 30, left: 50};
   width = 800 - this.margin.left - this.margin.right;
-  height = 470 - this.margin.top - this.margin.bottom;
+  height = 560 - this.margin.top - this.margin.bottom;
 
   @Input()
   oneGameForChart: IGameDataModel;
@@ -78,7 +78,8 @@ export class RealTimeChartComponent implements OnInit {
       this.updateChart();
 
     } else {
-      this.buildChart()
+      this.buildChart();
+      this.addLegend();
     }
 
 
@@ -101,8 +102,8 @@ export class RealTimeChartComponent implements OnInit {
   }
 
   buildChart() {
-    this.chartProps = {};
 
+    this.chartProps = {};
 
     // Set the ranges
     this.chartProps.x = d3.scaleTime().range([0, this.width]);
@@ -116,19 +117,19 @@ export class RealTimeChartComponent implements OnInit {
     this.svg = d3.select(this.chartElement.nativeElement)
       .append('svg')
       .attr('width', this.width + this.margin.left + this.margin.right)
-      .attr('height', this.height + this.margin.top + this.margin.bottom);
+      .attr('height', this.height + this.margin.top + this.margin.bottom+40);
 
     const main = this.svg.append('g')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
 
 
     // // in main group, add chart title
-    main.append('text')
-      .attr('class', 'chartTitle')
-      .attr('x', this.width / 2)
-      .attr('y', -20)
-      .attr('dy', '.71em')
-      .text((d) => 'Chart Title');
+    // main.append('text')
+    //   .attr('class', 'chartTitle')
+    //   .attr('x', this.width / 2)
+    //   .attr('y', -20)
+    //   .attr('dy', '.71em')
+    //   .text((d) => 'Chart Title');
     //
 
     // Scale the range of the data
@@ -158,10 +159,7 @@ export class RealTimeChartComponent implements OnInit {
   }
 
   addPathSelector() {
-
-
     this.gamesArray.forEach((game, index) => {
-
       if (d3.select(`#path_${index + 1}`).empty()) {
 
         this.svg.append('path')
@@ -171,72 +169,78 @@ export class RealTimeChartComponent implements OnInit {
           .attr('id', `path_${index + 1}`)
       }
     })
-
-
   }
 
   addLegend() {
 
+    const legendKeys = this.gamesArray.map(a => a.game_name);
+    const legendG = this.svg.selectAll(".legend")
+      .data(legendKeys, (d) => d)
 
-    this.legendKeys = this.gamesArray.map(item => item.game_name);
+    let legendEnter = legendG.enter();
 
-    if (d3.select('mydots').empty()) {
-      this.svg.selectAll("mydots")
-        .data(this.legendKeys)
-        .enter()
-        .append("circle")
-        .attr("cx", this.width - this.margin.left - this.margin.right)
-        .attr("cy", (d, i) => {
-          return 100 + i * 25
-        }) // 100 is where the first dot appears. 25 is the distance between dots
-        .attr("r", 7)
-        .style("fill", (d, i) => this.color[i])
-    }
+    legendEnter = legendEnter.append("g")
+      .attr("class", "legend");
 
-
-    this.svg.selectAll("mylabels")
-      .data(this.legendKeys)
-      .enter()
-      .append("text")
-      .attr("x", this.width + 20 - this.margin.left - this.margin.right)
-      .attr("y", (d, i) => {
-        return 100 + i * 25
+    //Now merge Enter and Update and adjust the location
+    legendEnter.merge(legendG)
+      .attr("transform", (d, i) => {
+        return "translate(" + (this.width = this.margin.left / 2) + ","
+          + (i * 15 + this.height + 20) + ")";
       })
-      .style("fill", (d, i) => this.color[i])
-      .text((d) => d)
-      .attr("text-anchor", "right")
-      .style("alignment-baseline", "middle");
+      .attr("class", "legend");
 
+    legendG.exit().remove();
+
+    // Apend only to the enter selection
+    legendEnter.append("rect")
+      .attr("width", 10)
+      .attr("height", 10)
+      .attr("fill",  (d, i)=> {
+        return this.color[i];
+      });
+
+    // Apend only to the enter selection
+    legendEnter.append("text")
+      .text((d) => d)
+      .style("font-size", 14)
+      .attr("y", 12)
+      .attr("fill", (d, i) => this.color[i])
+      .attr("x", 14);
 
   }
 
   updateChart() {
     this.addPathSelector();
     this.addLegend();
-    // this.chartProps.y =d3.scaleLinear()
-    //   .domain([0, 3])
-    //   .range([0, 600]);
-    const a = this.gamesArray.map((game, index) => {
-      return {
-        date: new Date().getTime(),
-        category: `category${index + 1}`,
-        counter: game.game_data.map(a => a.counter)
-      }
-    });
+    const yDomainArray = this.gamesArray.map(game => game.game_data
+      .map(data => data.counter)
+      .reduce(a => Math.max(a)))
+      .map(value => {
+        const log = Math.round(Math.log10(value));
+        switch (log) {
+          case 1:
+           return value + 1;
+          case 2:
+           return value + 10;
+          case 3:
+           return value + 100;
+          case 4:
+          case 5:
+           return value + 1000;
+        }
+      }).sort((a, b) => a - b);
+
+    this.chartProps.y = d3.scaleLinear()
+      .domain([0, ...yDomainArray]).nice()
+      .range([this.height-this.margin.top, (this.height-this.margin.top)/2,150, 0])
+
+
+
     this.gamesArray.forEach((game, index) => {
 
       // Scale the range of the data again
-      this.chartProps.x.domain(d3.extent(game.game_data, (d) => {
-
-        return new Date(d.date).getTime();
-
-      }));
-      // this.chartProps.y.domain([d3.min(game.game_data, (d) => {
-      //   return Math.max(d.counter) - 100;
-      // }), d3.max(game.game_data, (d) => {
-      //   return Math.max(d.counter) + 100;
-      // })]);
-
+      this.chartProps.x.domain(d3.extent(game.game_data, (d) => new Date(d.date).getTime()));
       const a = this.createValueLine();
 
 
@@ -259,8 +263,12 @@ export class RealTimeChartComponent implements OnInit {
 
   createValueLine() {
     return d3.line<IGameDataModel>()
-      .x((data) => this.chartProps.x(new Date(data.date).getTime()))
-      .y((data) => this.chartProps.y(data.counter));
+      .x((data) => {
+        return this.chartProps.x(new Date(data.date).getTime())
+      })
+      .y((data) => {
+        return this.chartProps.y(data.counter)
+      });
   }
 
   getLastUpdated() {

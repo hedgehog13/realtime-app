@@ -1,8 +1,7 @@
 import {Component, OnInit} from '@angular/core';
-import {HttpClient, HttpHeaders} from "@angular/common/http";
-import {environment} from "../environments/environment";
-import {map} from "rxjs/operators";
+import {HttpHeaders} from "@angular/common/http";
 import {WebsocketService} from "./websocket.service";
+import {IGameDataModel, IGamesModel} from "./real-time-chart/gameData.model";
 
 
 @Component({
@@ -15,27 +14,63 @@ export class AppComponent implements OnInit {
   httpOptions = {headers: new HttpHeaders({'Content-Type': 'application/json'})};
 
 
-  imgSrc;
+  res;
 
-  constructor(private http: HttpClient, ) {
+  gameDataStatus: IGameDataModel[];
+  gameDataArr: IGameDataModel;
+  gamesArray: IGamesModel[] = [];
+  gameDataStatusToPlot: IGameDataModel[];
+  testToPlot: IGamesModel[];
 
-    console.log(document.location.hash)
+
+
+
+  set GameDataStatus(status: IGameDataModel[]) {
+
+    this.gameDataStatus = status;
+    this.gameDataStatusToPlot = this.gameDataStatus.slice(0, 20);
+  }
+
+  set GamesArrayForChart(status: IGameDataModel) {
+
+
+    // status.forEach(item => {
+    //   const index = this.gamesArray.findIndex(game => game.game_id === item.game_data.id);
+    //
+    //   if (index < 0) {
+    //     this.gamesArray.push({
+    //       game_id: item.game_data.id,
+    //       game_data: [...status]
+    //     })
+    //   } else {
+    //     this.gamesArray[index].game_data.push(item)
+    //   }
+    // })
+    this.gameDataArr = status;
+
+    this.testToPlot = this.gamesArray.slice(0, 20);
+
+  }
+
+  constructor(private socketService: WebsocketService) {
+
+    this.GameDataStatus;
+    this.GamesArrayForChart;
+    this.gameDataArr;
+    let gamesDataUpdateObservable = this.socketService.getUpdates();
+    gamesDataUpdateObservable.subscribe((latestStatus: IGameDataModel) => {  // 2
+
+      //  this.GameDataStatus = [latestStatus].concat(this.gameDataStatus);  // 3
+      this.GamesArrayForChart = latestStatus;
+      //console.log(this.gameDataStatus);
+    });
+
   }
 
   ngOnInit(): void {
-    const httpOptions = {headers: new HttpHeaders({'Content-Type': 'application/json'})};
-    this.http.get(`${environment.apiUrl}home`, httpOptions)
-      .subscribe(res => {
-        console.log(res);
-        if(res['res']!=='error'){
-          localStorage.setItem('accesstoken', res['accessToken']);
 
-          this.imgSrc = res['data'][0].profile_image_url;
-        }
+    this.res = this.socketService.counter;
 
-       // this.ssocket.connect();
-
-      })
-    // }
   }
+
 }
