@@ -40,30 +40,13 @@ export class RealTimeChartComponent implements OnInit {
   margin = {top: 30, right: 20, bottom: 30, left: 50};
   width = 800 - this.margin.left - this.margin.right;
   height = 560 - this.margin.top - this.margin.bottom;
-
+  xAxis;
   @Input()
   oneGameForChart: IGameDataModel;
 
-  /*ngx-chart chart options
-    view: any[] = [1000, 500];
-    legend: boolean = true;
-    showLabels: boolean = true;
-    animations: boolean = true;
-    xAxis: boolean = true;
-    yAxis: boolean = true;
-    showYAxisLabel: boolean = true;
-    showXAxisLabel: boolean = true;
-    xAxisLabel: string = 'Time';
-    yAxisLabel: string = 'Counter';
-    timeline: boolean = true;
+  mappedArray = [];
 
-    colorScheme = {
-      domain: ['#5AA454', '#E44D25', '#CFC0BB', '#7aa3e5', '#a8385d', '#aae3f5']
-    };
-    test = [];
-
-  ngx-chart chart options*/
-
+  //[{time:current time, game1:{counter:current_counter, name:game_name}, game2:{counter:current_counter, name:game_name}]
 
   constructor() {
   }
@@ -81,8 +64,6 @@ export class RealTimeChartComponent implements OnInit {
       this.buildChart();
       this.addLegend();
     }
-
-
   }
 
   createGameArray() {
@@ -101,9 +82,22 @@ export class RealTimeChartComponent implements OnInit {
 
   }
 
+  createMappedArray() {
+    //{time:current time, game1:{counter:current_counter, name:game_name},
+    const obj = {
+      time: new Date().getTime(),
+      [this.oneGameForChart.game_data.id]: {
+        counter: this.oneGameForChart.counter,
+        name: this.oneGameForChart.game_data.name
+      }
+    }
+    this.mappedArray.push(obj);
+  }
+
   buildChart() {
 
     this.chartProps = {};
+
 
     // Set the ranges
     this.chartProps.x = d3.scaleTime().range([0, this.width]);
@@ -112,12 +106,12 @@ export class RealTimeChartComponent implements OnInit {
 
     // Define the axes
     const xAxis = d3.axisBottom(this.chartProps.x);
-    const yAxis = d3.axisLeft(this.chartProps.y).ticks(5);
+    const yAxis = d3.axisLeft(this.chartProps.y);
 
     this.svg = d3.select(this.chartElement.nativeElement)
       .append('svg')
       .attr('width', this.width + this.margin.left + this.margin.right)
-      .attr('height', this.height + this.margin.top + this.margin.bottom+40);
+      .attr('height', this.height + this.margin.top + this.margin.bottom + 40);
 
     const main = this.svg.append('g')
       .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
@@ -196,7 +190,7 @@ export class RealTimeChartComponent implements OnInit {
     legendEnter.append("rect")
       .attr("width", 10)
       .attr("height", 10)
-      .attr("fill",  (d, i)=> {
+      .attr("fill", (d, i) => {
         return this.color[i];
       });
 
@@ -220,44 +214,48 @@ export class RealTimeChartComponent implements OnInit {
         const log = Math.round(Math.log10(value));
         switch (log) {
           case 1:
-           return value + 1;
+            return value + 1;
           case 2:
-           return value + 10;
+            return value + 10;
           case 3:
-           return value + 100;
+            return value + 100;
           case 4:
           case 5:
-           return value + 1000;
+            return value + 1000;
         }
       }).sort((a, b) => a - b);
 
     this.chartProps.y = d3.scaleLinear()
       .domain([0, ...yDomainArray]).nice()
-      .range([this.height-this.margin.top, (this.height-this.margin.top)/2,150, 0])
+      .range([this.height - this.margin.top, (this.height - this.margin.top) - 100, 150, 0]);
 
-
+   this.chartProps.yAxis = d3.axisLeft(this.chartProps.y)
+    .scale(this.chartProps.y)
+     .tickValues(yDomainArray)
 
     this.gamesArray.forEach((game, index) => {
 
       // Scale the range of the data again
       this.chartProps.x.domain(d3.extent(game.game_data, (d) => new Date(d.date).getTime()));
+
+
       const a = this.createValueLine();
 
-
-      //   // Make the changes to the line chart
+      // Make the changes to the line chart
       this.chartProps.svg.select(`.line.line${index + 1}`) // update the line
         .style('stroke', this.color[index])
         .style('fill', 'none')
         .attr('d', a(game.game_data))
-
     });
-    //  this.chartProps.y.domain(this.gamesArray.map(a=>a.category));
-    this.chartProps.svg.transition();
+
+    // this.chartProps.svg.transition();
     this.chartProps.svg.select('.x.axis') // update x axis
       .call(this.chartProps.xAxis);
+    //
+    this.chartProps.svg.select('.y.axis')
+      .attr("transform", `translate(${this.margin.top},0)`)// update y axis
+      .call(this.chartProps.yAxis)
 
-    this.chartProps.svg.select('.y.axis') // update y axis
-      .call(this.chartProps.yAxis);
 
   }
 

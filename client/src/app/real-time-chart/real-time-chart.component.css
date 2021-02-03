@@ -2,15 +2,26 @@
   max-width: 600px;
   max-height: 400px;
 }
-.line1{
-  stroke:red;
-  fill: none;
+.chart .axis {
+  stroke-width: 1;
 }
-.line2{
-  stroke:green;
-  fill: none;
+
+.chart .axis .tick line {
+  stroke: black;
 }
-.line3{
-  strok:yellow;
-  fill:none
+
+.chart .axis .tick text {
+  fill: black;
+  font-size: 0.7em;
+}
+
+.chart .axis .domain {
+  fill: none;
+  stroke: black;
+}
+
+.chart .group {
+  fill: none;
+  stroke: black;
+  stroke-width: 1.5;
 }
