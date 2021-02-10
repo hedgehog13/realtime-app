@@ -11,11 +11,7 @@ import {IGameDataModel} from "./real-time-chart/gameData.model";
 export class WebsocketService {
   private socket;
   counter = new Subject();
-  dataArrayChanged = new Subject();
-  private item_game;
-  private dataArray = [];
-  firstGame;
-  secondGame;
+
 
   constructor() {
     this.setupSocketConnection();
@@ -24,37 +20,11 @@ export class WebsocketService {
 
   setupSocketConnection() {
     this.socket = io.io(environment.apiUrl);
-
-      this.socket.on('getCounter', (data) => {
-          console.log('data COUNTER:', data);
+    this.socket.on('getCounter', (data) => {
       this.counter.next(data);
 
     });
-    //
-    // this.socket.on('getCounterForChart', (data) => {
-    //   //   //
-    //   const found = this.dataArray.find(item => {
-    //     return item.id === data.game_data.name
-    //   });
-    //   if (this.dataArray.length === 0 || !found) {
-    //     const arrValue = {
-    //       id: data.game_data.name,
-    //       values: [{'date': new Date(), counter: data.counter}]
-    //     };
-    //
-    //     this.dataArray.push(arrValue)
-    //   } else {
-    //     this.item_game = this.dataArray.find(item => item.id === data.game_data.name);
-    //  //   this.item_game.values.push({'date': new Date(), counter: data.counter})
-    //
-    //   }
-    //  // debugger;
-    //   this.dataArrayChanged.next(data);
-    //   //
-    // })
-
   }
-
   getUpdates() {
     let gameDataSub = new Subject<IGameDataModel>();
     let gameDataSubObservable = from(gameDataSub);
@@ -62,6 +32,15 @@ export class WebsocketService {
       gameDataSub.next(gameData);
     });
 
+    return gameDataSubObservable;
+  }
+
+  getGamesForChart() {
+    const gamesArraySubscription = new Subject<any[]>()
+    let gameDataSubObservable = from(gamesArraySubscription);
+    this.socket.on('getChartData_new', (res:any[]) => {
+      gamesArraySubscription.next(res);
+    })
     return gameDataSubObservable;
   }
 }

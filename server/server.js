@@ -2,7 +2,7 @@ const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
 const axios = require('axios');
-const moment = require('moment');
+
 const TWITCH_CLIENT_ID = 'bnovmkukib4m30y39t9w03tnu34jxe';
 const TWITCH_SECRET = '2w698wvvbqfdrpd8l31oz8jo9xrtns';
 const SESSION_SECRET = 'some_secret';
@@ -91,16 +91,26 @@ async function getCounterForChart(array_games, accessToken) {
     let result;
     let testArray = array_games.filter(a => a.name !== 'Tom Clancy\'s Rainbow Six Siege');
     //console.log('AAAAAAA', array_games)
+
+    let test = [];
     for (let i = 0; i < array_games.length; i++) {
-      //  console.log('***************',array_games[i]);
+
         result = await getGameData('', accessToken, 0, array_games[i]);
-         result.date = new Date();
-     //   console.log('***************', result);
-
-         io.sockets.emit('getCounterForChart', result);
+        result.date = new Date();
+        test.push(result)
     }
-    if (result && accessToken) {
+   const  resData= test.map(a => {
+        const date = new Date().getTime();
+        return {
+            date: date,
+            name: a.game_data.name,
+            id: a.game_data.id,
+            counter: a.counter
+        }
+    });
 
+    io.sockets.emit('getChartData_new', resData);
+    if (result && accessToken) {
         getCounterForChart(array_games, accessToken).catch(err => console.log(err));
 
     }
@@ -140,7 +150,7 @@ async function getGameData(newCursor, accessToken, counter, game_data) {
 io.on('connection', (socket) => {
 
     console.log("User Connected");
-   // axios.post('http://localhost:8000/auth/twitch').catch(error => console.log('auth error', error));
+    // axios.post('http://localhost:8000/auth/twitch').catch(error => console.log('auth error', error));
     socket.on('disconnect', (msg) => {
         console.log("User DisConnected");
     });

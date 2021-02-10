@@ -10,11 +10,10 @@ import {
 
 
 import * as d3 from 'd3';
-import * as d3Scale from 'd3-scale';
 
-import {NgxChartsModule} from '@swimlane/ngx-charts';
 
-import {IGameDataModel, IGamesModel} from "./gameData.model";
+import {IGameDataModel} from "./gameData.model";
+
 
 
 @Component({
@@ -30,69 +29,68 @@ export class RealTimeChartComponent implements OnInit {
   @ViewChild('chart', {static: true}) chartElement: ElementRef;
 
   color = d3.schemeCategory10;
-  parseDate = d3.timeParse('%d-%m-%Y');
-  private svgElement: HTMLElement;
   private chartProps: any;
   private svg;
-  legendKeys = [];
-  gamesArray: IGamesModel[] = [];
+
+
   // Set the dimensions of the canvas / graph
   margin = {top: 30, right: 20, bottom: 30, left: 50};
   width = 800 - this.margin.left - this.margin.right;
   height = 560 - this.margin.top - this.margin.bottom;
   xAxis;
+  mouseG;
+  lines;
+  glines;
+  focus;
   @Input()
   oneGameForChart: IGameDataModel;
 
-  mappedArray = [];
+  @Input()
+  newElement = [];
 
-  //[{time:current time, game1:{counter:current_counter, name:game_name}, game2:{counter:current_counter, name:game_name}]
+  a = [];
+  newMappedArray = []
+
+
 
   constructor() {
   }
 
   ngOnInit(): void {
 
+    this.buildChart();
+    this.addLegend();
+
   }
 
   ngOnChanges() {
-    if (this.oneGameForChart) {
+
+    if (this.newElement) {
       this.createGameArray();
-      this.updateChart();
+      this.updateChartNew();
 
     } else {
-      this.buildChart();
-      this.addLegend();
+
     }
   }
 
   createGameArray() {
-    const index = this.gamesArray.findIndex(game => game.game_id === this.oneGameForChart.game_data.id);
 
-    if (index < 0) {
+    this.a.push(...this.newElement);
 
-      this.gamesArray.push({
-        game_id: this.oneGameForChart.game_data.id,
-        game_data: [...[this.oneGameForChart]],
-        game_name: this.oneGameForChart.game_data.name
-      })
-    } else {
-      this.gamesArray[index].game_data.push(this.oneGameForChart)
-    }
-
-  }
-
-  createMappedArray() {
-    //{time:current time, game1:{counter:current_counter, name:game_name},
-    const obj = {
-      time: new Date().getTime(),
-      [this.oneGameForChart.game_data.id]: {
-        counter: this.oneGameForChart.counter,
-        name: this.oneGameForChart.game_data.name
+    this.newMappedArray = d3.groups(
+      this.a,
+      o => o.name,
+    ).map(([name, obj]) => {
+      let values;
+      values = obj.slice(-20);
+      return {
+        name,
+        values
       }
-    }
-    this.mappedArray.push(obj);
+    });
   }
+
 
   buildChart() {
 
@@ -106,7 +104,8 @@ export class RealTimeChartComponent implements OnInit {
 
     // Define the axes
     const xAxis = d3.axisBottom(this.chartProps.x);
-    const yAxis = d3.axisLeft(this.chartProps.y);
+
+
 
     this.svg = d3.select(this.chartElement.nativeElement)
       .append('svg')
@@ -126,10 +125,7 @@ export class RealTimeChartComponent implements OnInit {
     //   .text((d) => 'Chart Title');
     //
 
-    // Scale the range of the data
-    this.chartProps.x.domain(
-      d3.extent([new Date().getTime()]));
-    this.chartProps.y.domain([0, this.height]);
+
 
 
     // Add the X Axis
@@ -141,35 +137,123 @@ export class RealTimeChartComponent implements OnInit {
     // Add the Y Axis
     this.svg.append('g')
       .attr('class', 'y axis')
-      .call(yAxis);
+
 
 
     // Setting the required objects in chartProps so they could be used to update the chart
     this.chartProps.svg = this.svg;
     this.chartProps.xAxis = xAxis;
-    this.chartProps.yAxis = yAxis;
+    // this.chartProps.yAxis = yAxis;
+    this.lines = this.svg.append('g')
+      .attr('class', 'lines');
 
 
+    this.mouseG = this.svg.append("g")
+      .attr("class", "mouse-over-effects");
+
+    this.mouseG.append("path") // create vertical line to follow mouse
+      .attr("class", "mouse-line")
+      .style("stroke", "#A9A9A9")
+      .style("stroke-width", '2px')
+      .style("opacity", "0")
+      .attr('transform', `translate(${this.margin.left},0)`);
+
+
+    this.mouseG.append('svg:rect') // append a rect to catch mouse movements on canvas
+      .attr('width', this.width)
+      .attr('height', this.height)
+      .attr('fill', 'none')
+      .attr('pointer-events', 'all')
+      .attr('transform', `translate(${this.margin.left},0)`)
+      .on('mouseout', () => { // on mouse out hide line, circles and text
+        d3.select(".mouse-line")
+          .style("opacity", "0");
+        d3.selectAll(".mouse-per-line circle")
+          .style("opacity", "0");
+        d3.selectAll(".mouse-per-line  text")
+          .style("opacity", "0");
+
+
+      })
+      .on('mouseover', (d) => { // on mouse in show line, circles and text
+
+        d3.select(".mouse-line")
+          .style("opacity", "1");
+        d3.selectAll(".mouse-per-line circle")
+          .style("opacity", "1");
+        d3.selectAll(".mouse-per-line  text")
+          .style("opacity", "1")
+      })
+      .on('mousemove', (event) => { // update tooltip content, line, circles and text when mouse moves
+
+        this.chartProps.svg.selectAll(".mouse-per-line")
+          .attr("transform", (d) => {
+            const xDate = this.chartProps.x.invert(event.pageX);// use 'invert' to get date corresponding to distance from mouse position relative to svg
+            const bisect = d3.bisector((d) => d['date']).left; // retrieve row index of date
+            const idx = bisect(d.values, xDate) - 1 < 0 ? 0 : bisect(d.values, xDate) - 1;
+
+            d3.select(".mouse-line")
+              .attr("d", () => {
+                let data = "M" + this.chartProps.x(d.values[idx].date) + "," + (this.height);
+                data += " " + this.chartProps.x(d.values[idx].date) + "," + 0;
+                return data;
+              });
+
+
+            return "translate(" + this.chartProps.x(d.values[idx].date) + "," + this.chartProps.y(d.values[idx].counter) + ")";
+          })
+
+      });
   }
+
 
   addPathSelector() {
-    this.gamesArray.forEach((game, index) => {
-      if (d3.select(`#path_${index + 1}`).empty()) {
+    const groups = d3.group(this.newMappedArray, (a) => a.name).entries();
+    this.glines = this.lines.selectAll('.line-group')
+      .data(groups)
+      .enter()
+      .append('g')
+      .attr('class', 'line-group')
+      .append('path')
+      .attr('class', `line`)
+      .style('stroke', this.color)
+      .style('fill', 'none')
+      .exit()
+      .remove()
 
-        this.svg.append('path')
-          .attr('class', `line line${index + 1}`)
-          .style('stroke', this.color)
-          .style('fill', 'none')
-          .attr('id', `path_${index + 1}`)
-      }
-    })
+
+    let mousePerLine = this.mouseG.selectAll('.mouse-per-line')
+      .data(this.newMappedArray)
+      .enter()
+      .append("g")
+      .attr("class", "mouse-per-line")
+
+    mousePerLine.append("circle")
+      .attr("class", "circle")
+      .attr("r", 7)
+      .style("stroke", (d, i) => {
+        return this.color[i]
+      })
+      .style("fill", "none")
+      .style("stroke-width", '1.5')
+      .style("opacity", "0")
+      .attr('transform', `translate(${this.margin.left},0)`)
+
+
+    mousePerLine.append("text")
+      .attr("transform", "translate(10,3)")
+
   }
+
+
 
   addLegend() {
 
-    const legendKeys = this.gamesArray.map(a => a.game_name);
+
+    const keys = d3.group(this.newMappedArray, (a) => a.name).keys();
     const legendG = this.svg.selectAll(".legend")
-      .data(legendKeys, (d) => d)
+      .data(keys, (d) => d);
+
 
     let legendEnter = legendG.enter();
 
@@ -186,112 +270,86 @@ export class RealTimeChartComponent implements OnInit {
 
     legendG.exit().remove();
 
+    // Append only to the enter selection
+    legendEnter.append("circle")
+      .attr("class", "legend-node")
+      .attr("cx", 0)
+      .attr("cy", 0)
+      .attr("r", 6)
+      .style("fill", (d, i) => this.color[i])
+      .attr("transform", `translate(${this.margin.right}, 4)`);
     // Apend only to the enter selection
-    legendEnter.append("rect")
-      .attr("width", 10)
-      .attr("height", 10)
-      .attr("fill", (d, i) => {
-        return this.color[i];
-      });
 
-    // Apend only to the enter selection
     legendEnter.append("text")
-      .text((d) => d)
+      .attr("class", "legend-text")
+      .attr("x", 6 * 2 + 2)
+      .attr("y", 6)
+      .style("fill", "#A9A9A9")
       .style("font-size", 14)
-      .attr("y", 12)
-      .attr("fill", (d, i) => this.color[i])
-      .attr("x", 14);
+      .text(d => d)
+      .attr("transform", `translate(${this.margin.right}, 4)`);
+
 
   }
 
-  updateChart() {
+
+  updateChartNew() {
     this.addPathSelector();
     this.addLegend();
-    const yDomainArray = this.gamesArray.map(game => game.game_data
-      .map(data => data.counter)
-      .reduce(a => Math.max(a)))
-      .map(value => {
-        const log = Math.round(Math.log10(value));
-        switch (log) {
-          case 1:
-            return value + 1;
-          case 2:
-            return value + 10;
-          case 3:
-            return value + 100;
-          case 4:
-          case 5:
-            return value + 1000;
-        }
-      }).sort((a, b) => a - b);
 
+
+    let dates = [];
+    dates = [...new Set(this.newMappedArray[0].values.map(a => a.date))];
+
+    this.chartProps.x
+      .domain(d3.extent(dates, d => d));
+
+    const xAxis = d3.axisBottom(this.chartProps.x);
+    this.chartProps.xAxix = xAxis;
+
+    const yDomainArray = this.newElement.map(a => a.counter).sort((a, b) => a - b);
     this.chartProps.y = d3.scaleLinear()
       .domain([0, ...yDomainArray]).nice()
-      .range([this.height - this.margin.top, (this.height - this.margin.top) - 100, 150, 0]);
+      .range([this.height, this.height / 2 + 150, this.height / 2, 0]);
 
-   this.chartProps.yAxis = d3.axisLeft(this.chartProps.y)
-    .scale(this.chartProps.y)
-     .tickValues(yDomainArray)
+    this.chartProps.yAxis = d3.axisLeft(this.chartProps.y)
+      .scale(this.chartProps.y)
+      .tickValues([0, ...yDomainArray]);
 
-    this.gamesArray.forEach((game, index) => {
-
-      // Scale the range of the data again
-      this.chartProps.x.domain(d3.extent(game.game_data, (d) => new Date(d.date).getTime()));
+    const line = this.createValueLine();
 
 
-      const a = this.createValueLine();
+    this.chartProps.svg.selectAll(`.line`)  //select line path within line-group (which represents a vehicle category), then bind new data
+      .data(this.newMappedArray)
+      .attr("stroke", (d, i) => {
+        return this.color[i]
+      })
+      .attr("stroke-width", 1.5)
+      .attr('class', 'line')
+      .attr("transform", `translate(${this.margin.left}, 0)`)
+      .transition().duration(750)
+      .attr('d', (d) => {
 
-      // Make the changes to the line chart
-      this.chartProps.svg.select(`.line.line${index + 1}`) // update the line
-        .style('stroke', this.color[index])
-        .style('fill', 'none')
-        .attr('d', a(game.game_data))
-    });
+        return line(d.values)
+      })
 
-    // this.chartProps.svg.transition();
+
     this.chartProps.svg.select('.x.axis') // update x axis
+      .attr("transform", `translate(${this.margin.left}, ${this.height})`)
+      .transition().duration(1000)
       .call(this.chartProps.xAxis);
-    //
+
     this.chartProps.svg.select('.y.axis')
-      .attr("transform", `translate(${this.margin.top},0)`)// update y axis
+      .attr("transform", `translate(${this.margin.left},0)`)// update y axis
       .call(this.chartProps.yAxis)
 
 
   }
 
   createValueLine() {
-    return d3.line<IGameDataModel>()
-      .x((data) => {
-        return this.chartProps.x(new Date(data.date).getTime())
-      })
-      .y((data) => {
-        return this.chartProps.y(data.counter)
-      });
-  }
-
-  getLastUpdated() {
-    // if (this.oneGameForChart) {
-    //
-    //   const index = this.test.findIndex(game => game.name === this.oneGameForChart.game_data.id);
-    //   const mappedItem = {
-    //     name: Math.round(new Date(this.oneGameForChart.date).getTime()),
-    //     value: this.oneGameForChart.counter,
-    //   };
-    //   if (index < 0) {
-    //
-    //     this.test.push({
-    //       name: this.oneGameForChart.game_data.id,
-    //       series: [mappedItem]
-    //     })
-    //   } else {
-    //     this.test[index].series.push(mappedItem)
-    //   }
-    //  // this.test = this.test.filter(item=>item.name!="460630")
-    //   this.test = [...this.test]
-    //
-    // }
+    return d3.line<any>()
+      .x((data) => this.chartProps.x(data.date))
+      .y((data) => this.chartProps.y(data.counter));
 
   }
-
-
 }

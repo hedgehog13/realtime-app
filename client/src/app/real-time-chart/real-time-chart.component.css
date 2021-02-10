@@ -25,3 +25,19 @@
   stroke: black;
   stroke-width: 1.5;
 }
+div.tooltip {
+  position: absolute;
+  text-align: center;
+  padding: .5rem;
+  background: red;
+  color: #f9f9f9;
+  border: 0px;
+  border-radius: 8px;
+  pointer-events: none;
+  font-size: .7rem;
+
+}
+
+.line{
+  color: blue;
+}
