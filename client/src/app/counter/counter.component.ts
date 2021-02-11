@@ -10,7 +10,7 @@ import {WebsocketService} from "../websocket.service";
 export class CounterComponent implements OnInit {
 
   res: any;
-
+ isLoading=true;
 
   constructor(private socketService: WebsocketService) {
 

@@ -25,16 +25,6 @@ export class WebsocketService {
 
     });
   }
-  getUpdates() {
-    let gameDataSub = new Subject<IGameDataModel>();
-    let gameDataSubObservable = from(gameDataSub);
-    this.socket.on('getCounterForChart', (gameData: IGameDataModel) => {
-      gameDataSub.next(gameData);
-    });
-
-    return gameDataSubObservable;
-  }
-
   getGamesForChart() {
     const gamesArraySubscription = new Subject<any[]>()
     let gameDataSubObservable = from(gamesArraySubscription);

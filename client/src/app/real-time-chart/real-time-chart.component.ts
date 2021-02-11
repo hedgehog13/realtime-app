@@ -15,7 +15,6 @@ import * as d3 from 'd3';
 import {IGameDataModel} from "./gameData.model";
 
 
-
 @Component({
   selector: 'app-real-time-chart',
   encapsulation: ViewEncapsulation.None,
@@ -35,8 +34,8 @@ export class RealTimeChartComponent implements OnInit {
 
   // Set the dimensions of the canvas / graph
   margin = {top: 30, right: 20, bottom: 30, left: 50};
-  width = 800 - this.margin.left - this.margin.right;
-  height = 560 - this.margin.top - this.margin.bottom;
+  width = 700 - this.margin.left - this.margin.right;
+  height = 470 - this.margin.top - this.margin.bottom;
   xAxis;
   mouseG;
   lines;
@@ -50,7 +49,6 @@ export class RealTimeChartComponent implements OnInit {
 
   a = [];
   newMappedArray = []
-
 
 
   constructor() {
@@ -83,7 +81,7 @@ export class RealTimeChartComponent implements OnInit {
       o => o.name,
     ).map(([name, obj]) => {
       let values;
-      values = obj.slice(-20);
+      values = obj.slice(-50);
       return {
         name,
         values
@@ -106,7 +104,6 @@ export class RealTimeChartComponent implements OnInit {
     const xAxis = d3.axisBottom(this.chartProps.x);
 
 
-
     this.svg = d3.select(this.chartElement.nativeElement)
       .append('svg')
       .attr('width', this.width + this.margin.left + this.margin.right)
@@ -126,8 +123,6 @@ export class RealTimeChartComponent implements OnInit {
     //
 
 
-
-
     // Add the X Axis
     this.svg.append('g')
       .attr('class', 'x axis')
@@ -139,7 +134,6 @@ export class RealTimeChartComponent implements OnInit {
       .attr('class', 'y axis')
 
 
-
     // Setting the required objects in chartProps so they could be used to update the chart
     this.chartProps.svg = this.svg;
     this.chartProps.xAxis = xAxis;
@@ -149,14 +143,16 @@ export class RealTimeChartComponent implements OnInit {
 
 
     this.mouseG = this.svg.append("g")
-      .attr("class", "mouse-over-effects");
+      .attr("class", "mouse-over-effects")
 
     this.mouseG.append("path") // create vertical line to follow mouse
       .attr("class", "mouse-line")
       .style("stroke", "#A9A9A9")
-      .style("stroke-width", '2px')
+      .style("stroke-width", '1px')
       .style("opacity", "0")
       .attr('transform', `translate(${this.margin.left},0)`);
+
+
 
 
     this.mouseG.append('svg:rect') // append a rect to catch mouse movements on canvas
@@ -184,24 +180,34 @@ export class RealTimeChartComponent implements OnInit {
         d3.selectAll(".mouse-per-line  text")
           .style("opacity", "1")
       })
+
       .on('mousemove', (event) => { // update tooltip content, line, circles and text when mouse moves
 
-        this.chartProps.svg.selectAll(".mouse-per-line")
-          .attr("transform", (d) => {
-            const xDate = this.chartProps.x.invert(event.pageX);// use 'invert' to get date corresponding to distance from mouse position relative to svg
+         this.chartProps.svg.selectAll(".mouse-per-line")
+
+          .attr("transform", (d, i) => {
+            const xDate = this.chartProps.x.invert(event.offsetX);// use 'invert' to get date corresponding to distance from mouse position relative to svg
             const bisect = d3.bisector((d) => d['date']).left; // retrieve row index of date
             const idx = bisect(d.values, xDate) - 1 < 0 ? 0 : bisect(d.values, xDate) - 1;
 
+
             d3.select(".mouse-line")
+
               .attr("d", () => {
                 let data = "M" + this.chartProps.x(d.values[idx].date) + "," + (this.height);
                 data += " " + this.chartProps.x(d.values[idx].date) + "," + 0;
                 return data;
               });
 
-
             return "translate(" + this.chartProps.x(d.values[idx].date) + "," + this.chartProps.y(d.values[idx].counter) + ")";
-          })
+          }).selectChild('text').text((d)=>{
+           const xDate = this.chartProps.x.invert(event.offsetX-this.margin.left);// use 'invert' to get date corresponding to distance from mouse position relative to svg
+           const bisect = d3.bisector((d) => d['date']).left; // retrieve row index of date
+           const idx = bisect(d.values, xDate) - 1 < 0 ? 0 : bisect(d.values, xDate) - 1;
+
+           return d.values[idx].counter
+         })
+
 
       });
   }
@@ -219,14 +225,14 @@ export class RealTimeChartComponent implements OnInit {
       .style('stroke', this.color)
       .style('fill', 'none')
       .exit()
-      .remove()
+      .remove();
 
 
     let mousePerLine = this.mouseG.selectAll('.mouse-per-line')
       .data(this.newMappedArray)
       .enter()
       .append("g")
-      .attr("class", "mouse-per-line")
+      .attr("class", "mouse-per-line");
 
     mousePerLine.append("circle")
       .attr("class", "circle")
@@ -235,35 +241,30 @@ export class RealTimeChartComponent implements OnInit {
         return this.color[i]
       })
       .style("fill", "none")
-      .style("stroke-width", '1.5')
+      .style("stroke-width", '1')
       .style("opacity", "0")
-      .attr('transform', `translate(${this.margin.left},0)`)
+      .attr('transform', `translate(${this.margin.left},0)`);
 
 
     mousePerLine.append("text")
-      .attr("transform", "translate(10,3)")
+      .attr("transform", "translate(25,25)")
 
   }
 
 
-
   addLegend() {
-
-
     const keys = d3.group(this.newMappedArray, (a) => a.name).keys();
     const legendG = this.svg.selectAll(".legend")
       .data(keys, (d) => d);
 
-
     let legendEnter = legendG.enter();
-
     legendEnter = legendEnter.append("g")
       .attr("class", "legend");
 
     //Now merge Enter and Update and adjust the location
     legendEnter.merge(legendG)
       .attr("transform", (d, i) => {
-        return "translate(" + (this.width = this.margin.left / 2) + ","
+        return "translate(" + (this.width / 2) + ","
           + (i * 15 + this.height + 20) + ")";
       })
       .attr("class", "legend");
@@ -296,8 +297,6 @@ export class RealTimeChartComponent implements OnInit {
   updateChartNew() {
     this.addPathSelector();
     this.addLegend();
-
-
     let dates = [];
     dates = [...new Set(this.newMappedArray[0].values.map(a => a.date))];
 
@@ -308,6 +307,7 @@ export class RealTimeChartComponent implements OnInit {
     this.chartProps.xAxix = xAxis;
 
     const yDomainArray = this.newElement.map(a => a.counter).sort((a, b) => a - b);
+    yDomainArray[yDomainArray.length - 1] = yDomainArray[yDomainArray.length - 1] + this.margin.top;
     this.chartProps.y = d3.scaleLinear()
       .domain([0, ...yDomainArray]).nice()
       .range([this.height, this.height / 2 + 150, this.height / 2, 0]);
@@ -319,19 +319,14 @@ export class RealTimeChartComponent implements OnInit {
     const line = this.createValueLine();
 
 
-    this.chartProps.svg.selectAll(`.line`)  //select line path within line-group (which represents a vehicle category), then bind new data
+    this.chartProps.svg.selectAll(`.line`)  //select line path within line-group , then bind new data
       .data(this.newMappedArray)
-      .attr("stroke", (d, i) => {
-        return this.color[i]
-      })
+      .attr("stroke", (d, i) => this.color[i])
       .attr("stroke-width", 1.5)
       .attr('class', 'line')
       .attr("transform", `translate(${this.margin.left}, 0)`)
       .transition().duration(750)
-      .attr('d', (d) => {
-
-        return line(d.values)
-      })
+      .attr('d', (d) => line(d.values))
 
 
     this.chartProps.svg.select('.x.axis') // update x axis

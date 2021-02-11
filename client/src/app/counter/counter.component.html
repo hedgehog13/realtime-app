@@ -1,6 +1,8 @@
-<!--<div class='numCounter' #numCounter data-value='1234567'>-->
+<!--<div>-->
 
-<!--  <div><b data-value="0">1</b></div>-->
-<!--  <div><b data-value="0">2</b></div>-->
+<!--    <header>{{(res| async)?.game_data.name}}</header>-->
+<!--    <div class="userNumBar">{{(res| async)?.counter}}</div>-->
 
 <!--</div>-->
+<div class="overview_card-info"><h3>{{(res| async)?.game_data.name}}</h3></div>
+<div class="overview_card-icon">{{(res| async)?.counter}} current viewers</div>

@@ -2,6 +2,7 @@ import {Component, OnInit} from '@angular/core';
 import {HttpHeaders} from "@angular/common/http";
 import {WebsocketService} from "./websocket.service";
 import {IGameDataModel, IGamesModel} from "./real-time-chart/gameData.model";
+import {Observable} from "rxjs";
 
 
 @Component({
@@ -35,8 +36,16 @@ export class AppComponent implements OnInit {
 
   ngOnInit(): void {
 
-    this.res = this.socketService.counter;
+    const news$ = new Observable(observer => {
+      observer.next("Sports news");
+      observer.next("Politics news");
+    });
+
+    news$.subscribe(console.log);
+
 
   }
+
+
 
 }
