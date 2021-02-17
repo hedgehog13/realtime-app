@@ -81,7 +81,7 @@ export class RealTimeChartComponent implements OnInit {
       o => o.name,
     ).map(([name, obj]) => {
       let values;
-      values = obj.slice(-50);
+      values = obj.slice(-100);
       return {
         name,
         values
@@ -153,8 +153,6 @@ export class RealTimeChartComponent implements OnInit {
       .attr('transform', `translate(${this.margin.left},0)`);
 
 
-
-
     this.mouseG.append('svg:rect') // append a rect to catch mouse movements on canvas
       .attr('width', this.width)
       .attr('height', this.height)
@@ -183,7 +181,7 @@ export class RealTimeChartComponent implements OnInit {
 
       .on('mousemove', (event) => { // update tooltip content, line, circles and text when mouse moves
 
-         this.chartProps.svg.selectAll(".mouse-per-line")
+        this.chartProps.svg.selectAll(".mouse-per-line")
 
           .attr("transform", (d, i) => {
             const xDate = this.chartProps.x.invert(event.offsetX);// use 'invert' to get date corresponding to distance from mouse position relative to svg
@@ -200,13 +198,13 @@ export class RealTimeChartComponent implements OnInit {
               });
 
             return "translate(" + this.chartProps.x(d.values[idx].date) + "," + this.chartProps.y(d.values[idx].counter) + ")";
-          }).selectChild('text').text((d)=>{
-           const xDate = this.chartProps.x.invert(event.offsetX-this.margin.left);// use 'invert' to get date corresponding to distance from mouse position relative to svg
-           const bisect = d3.bisector((d) => d['date']).left; // retrieve row index of date
-           const idx = bisect(d.values, xDate) - 1 < 0 ? 0 : bisect(d.values, xDate) - 1;
+          }).selectChild('text').text((d) => {
+          const xDate = this.chartProps.x.invert(event.offsetX - this.margin.left);// use 'invert' to get date corresponding to distance from mouse position relative to svg
+          const bisect = d3.bisector((d) => d['date']).left; // retrieve row index of date
+          const idx = bisect(d.values, xDate) - 1 < 0 ? 0 : bisect(d.values, xDate) - 1;
 
-           return d.values[idx].counter
-         })
+          return d.values[idx].counter
+        })
 
 
       });
@@ -240,20 +238,25 @@ export class RealTimeChartComponent implements OnInit {
       .style("stroke", (d, i) => {
         return this.color[i]
       })
-      .style("fill", "none")
+      .style("fill", (d, i) => {
+        return this.color[i]
+      })
       .style("stroke-width", '1')
       .style("opacity", "0")
       .attr('transform', `translate(${this.margin.left},0)`);
 
 
     mousePerLine.append("text")
-      .attr("transform", "translate(25,25)")
+      .attr("transform", "translate(25,25)");
+
 
   }
 
 
   addLegend() {
-    const keys = d3.group(this.newMappedArray, (a) => a.name).keys();
+    const testArr = this.newElement.sort((a, b) => b.counter - a.counter);
+    const keys = d3.group(testArr, (a) => a.name).keys();
+
     const legendG = this.svg.selectAll(".legend")
       .data(keys, (d) => d);
 
@@ -277,7 +280,10 @@ export class RealTimeChartComponent implements OnInit {
       .attr("cx", 0)
       .attr("cy", 0)
       .attr("r", 6)
-      .style("fill", (d, i) => this.color[i])
+      .style("fill", (d, i) => {
+        return this.color[i]
+      })
+
       .attr("transform", `translate(${this.margin.right}, 4)`);
     // Apend only to the enter selection
 
@@ -296,25 +302,33 @@ export class RealTimeChartComponent implements OnInit {
 
   updateChartNew() {
     this.addPathSelector();
-    this.addLegend();
-    let dates = [];
-    dates = [...new Set(this.newMappedArray[0].values.map(a => a.date))];
+   // this.addLegend();
+    let dates = [...new Set(this.newMappedArray[0].values.map(a => a.date))];
 
     this.chartProps.x
-      .domain(d3.extent(dates, d => d));
+      .domain(d3.extent(dates, (d: number) => d));
 
-    const xAxis = d3.axisBottom(this.chartProps.x);
+    const xAxis = d3.axisBottom(this.chartProps.x)
+      .ticks(d3.timeMillisecond
+        .every(10));
     this.chartProps.xAxix = xAxis;
 
-    const yDomainArray = this.newElement.map(a => a.counter).sort((a, b) => a - b);
-    yDomainArray[yDomainArray.length - 1] = yDomainArray[yDomainArray.length - 1] + this.margin.top;
+
+    const yDomainArray = this.newElement.map(a => a).sort((a, b) => a.counter - b.counter);
+    //  yDomainArray[yDomainArray.length - 1] = yDomainArray[yDomainArray.length - 1] + this.margin.top + this.margin.bottom;
     this.chartProps.y = d3.scaleLinear()
-      .domain([0, ...yDomainArray]).nice()
-      .range([this.height, this.height / 2 + 150, this.height / 2, 0]);
+      .range([this.height, this.height / 2 + 100, this.height / 3, 0])
+      .domain([0, ...yDomainArray.map(a => a.counter)])
+      .nice(25)
+
 
     this.chartProps.yAxis = d3.axisLeft(this.chartProps.y)
       .scale(this.chartProps.y)
-      .tickValues([0, ...yDomainArray]);
+      .tickValues([0, ...yDomainArray.map(a => a.counter)])
+      .tickFormat((d: number, i) => {
+        return [0, ...yDomainArray.map(a => a.name)][i];
+      })
+    ;
 
     const line = this.createValueLine();
 
@@ -337,14 +351,18 @@ export class RealTimeChartComponent implements OnInit {
     this.chartProps.svg.select('.y.axis')
       .attr("transform", `translate(${this.margin.left},0)`)// update y axis
       .call(this.chartProps.yAxis)
-
+      .selectAll('text')
+      .attr("transform", "rotate(-70)")
+       .attr("y", 0 - 20)
+       .attr("dy", "3em")
+      .style("text-anchor", "end")
 
   }
 
   createValueLine() {
     return d3.line<any>()
       .x((data) => this.chartProps.x(data.date))
-      .y((data) => this.chartProps.y(data.counter));
+      .y((data) => this.chartProps.y(data.counter)).curve(d3.curveMonotoneX);
 
   }
 }

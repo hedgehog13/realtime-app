@@ -128,7 +128,13 @@ body {
 .card:nth-child(3) {
   grid-area: card3;
 }
+.flex-item {
+  margin: 30% 15%;
 
+}
+.flex-item img{
+  border-radius:5em;
+}
 /* responsive layout */
 @media only screen and (min-width: 750px) {
   .grid-container {
@@ -185,6 +191,7 @@ body {
   right: 20px;
   cursor: pointer;
 }
+
 @media only screen and (min-width: 750px) {
   .aside_close-icon {
     display: none;

@@ -32,7 +32,7 @@ app.all("/*", (req, res, next) => {
 const http = app.listen(8000,
     () => {
         console.log('started on port 8000');
-        axios.post('http://localhost:8000/auth/twitch').catch(error => console.log('auth error', error));
+        axios.post('http://localhost:8000/auth/twitch').catch(error => console.log('auth error'));
     });
 
 const io = require('socket.io')(http, {
@@ -45,14 +45,14 @@ app.post(CALLBACK_URL, (req, res) => {
     console.log(1)
 })
 app.post('/auth/twitch',
-    (req, res) => {
+    () => {
         const url_post = `https://id.twitch.tv/oauth2/token?client_id=${TWITCH_CLIENT_ID}&client_secret=${TWITCH_SECRET}&grant_type=client_credentials`;
         axios.post(url_post)
             .then(async result => {
                 const token = result.data.access_token;
                 const games_array = await getGames(token);
                 const counter_game = games_array.find(a => a.name === 'Tom Clancy\'s Rainbow Six Siege');
-                console.log(counter_game);
+
                 getCounter(token, counter_game).catch(err => {
                     console.log('getCounter', err);
                 });
@@ -83,24 +83,20 @@ async function getCounter(token, game_data) {
     if (result && token) getCounter(token, game_data).catch(err => console.log(err));
 
     io.sockets.emit('getCounter', result);
-    // return result;
-
 }
 
 async function getCounterForChart(array_games, accessToken) {
     let result;
-    let testArray = array_games.filter(a => a.name !== 'Tom Clancy\'s Rainbow Six Siege');
-    //console.log('AAAAAAA', array_games)
-
-    let test = [];
+    let resultArray = [];
     for (let i = 0; i < array_games.length; i++) {
 
         result = await getGameData('', accessToken, 0, array_games[i]);
         result.date = new Date();
-        test.push(result)
+        resultArray.push(result)
     }
-   const  resData= test.map(a => {
-        const date = new Date().getTime();
+    const date = new Date().getTime();
+   const  resData= resultArray.map(a => {
+
         return {
             date: date,
             name: a.game_data.name,
