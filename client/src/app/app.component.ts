@@ -1,8 +1,9 @@
 import {Component, OnInit} from '@angular/core';
-import {HttpHeaders} from "@angular/common/http";
+import {HttpClient, HttpHeaders} from "@angular/common/http";
 import {WebsocketService} from "./websocket.service";
 import {IGameDataModel, IGamesModel} from "./real-time-chart/gameData.model";
 import {Observable} from "rxjs";
+import {ActivatedRoute, Router} from "@angular/router";
 
 
 @Component({
@@ -23,8 +24,7 @@ export class AppComponent implements OnInit {
     this.oneObjectThreeGames = gamesObj
   }
 
-  constructor(private socketService: WebsocketService) {
-
+  constructor(private socketService: WebsocketService, private http: HttpClient, private router:Router) {
 
 
     let updatedObsv = this.socketService.getGamesForChart();
@@ -35,17 +35,7 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit(): void {
-
-    const news$ = new Observable(observer => {
-      observer.next("Sports news");
-      observer.next("Politics news");
-    });
-
-    news$.subscribe(console.log);
-
-
   }
-
 
 
 }

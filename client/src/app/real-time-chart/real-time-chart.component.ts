@@ -57,7 +57,7 @@ export class RealTimeChartComponent implements OnInit {
   ngOnInit(): void {
 
     this.buildChart();
-    this.addLegend();
+ //   this.addLegend();
 
   }
 
