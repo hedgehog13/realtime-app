@@ -1,4 +1,4 @@
-const axios = require('axios');
+ const axios = require('axios');
 const config = require('../config/config');
 
 
@@ -6,22 +6,20 @@ exports.getGames = async (req, res) => {
 
     const token = req.token.access_token;
     const io = req.io;
-    const options = {
-        method: 'GET',
-        headers: {
-            'Client-ID': config.client_id,
-            'Authorization': 'Bearer ' + token
-        }
-    };
+  //
+
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    axios.defaults.headers.common['Client-ID'] =  config.client_id;
+
     // let games_array;
     const url = encodeURI('https://api.twitch.tv/helix/games?name=Rainbow Six Siege&name=Far Cry 5&name=Assassin\'s Creed: Odyssey');
-    const games_array = (await axios.get(url, options)).data.data;
+    const games_array = (await axios.get(url)).data.data;
     const counter_game = games_array.find(a => a.name === 'Tom Clancy\'s Rainbow Six Siege');
 
     getCounter(token, counter_game, io).catch(err => {
         console.log('getCounter', err);
     });
-
+    //
     getCounterForChart(games_array, token, io)
         .catch(error => console.log('getCounterForChart', error));
 
@@ -44,13 +42,13 @@ const getCounterForChart = async (array_games, accessToken, io) => {
         resultArray.push(result)
     }
     const date = new Date().getTime();
-    const resData = resultArray.map(a => {
+    const resData = resultArray.map(game => {
 
         return {
             date: date,
-            name: a.game_data.name,
-            id: a.game_data.id,
-            counter: a.counter
+            name: game.game_data.name,
+            id: game.game_data.id,
+            counter: game.counter
         }
     });
 
@@ -63,18 +61,10 @@ const getCounterForChart = async (array_games, accessToken, io) => {
 
 const getGameData = async (newCursor, accessToken, counter, game_data) => {
 
-    const options = {
-        method: 'GET',
-        headers: {
-            'Client-ID': config.client_id,
-            'Authorization': 'Bearer ' + accessToken
-        }
-    };
-
     const url = `https://api.twitch.tv/helix/streams?first=100&game_id=${game_data.id}&after=${newCursor}`;
     try {
 
-        const response = await axios.get(url, options).catch(err => console.log('getGameData ERROR', err));
+        const response = await axios.get(url).catch(err => console.log('getGameData ERROR', err));
         counter += response.data.data.reduce((prev, cur) => prev + cur.viewer_count, 0);
 
         if (response && response.data.pagination.cursor) {

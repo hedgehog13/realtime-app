@@ -10,6 +10,7 @@ exports.getToken = async (req, res, next) => {
         accessToken = await axios.post(url_post).catch(e => console.log('get token', e));
     }
     req.token = accessToken.data;
+
     return next();
 
 }
