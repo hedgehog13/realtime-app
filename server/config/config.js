@@ -7,5 +7,6 @@ module.exports = {
     client_id: process.env.TWITCH_CLIENT_ID,
     callback_url: process.env.CALLBACK_URL,
     port: parseInt(process.env.PORT) || 8000,
-    socket_origin: process.env.SOCKET_ORIGIN
+    socket_origin: process.env.SOCKET_ORIGIN,
+    token_url:'https://id.twitch.tv/oauth2/token'
 };

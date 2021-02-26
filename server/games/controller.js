@@ -1,22 +1,30 @@
- const axios = require('axios');
+const axios = require('axios');
 const config = require('../config/config');
 
+const games = ['Rainbow Six Siege', 'Far Cry 5', 'Assassin\'s Creed: Odyssey'];
+const GAME_FOR_COUNTER = 'Rainbow Six Siege';
 
+const games_url = 'https://api.twitch.tv/helix/games?';
+const streams_url = 'https://api.twitch.tv/helix/streams?first=100';
+const constract_games_url = () => {
+    let url = new URL(games_url);
+    for (let i = 0; i < games.length; i++) {
+        url.searchParams.append('name', games[i]);
+    }
+    return encodeURI(url.toString());
+
+}
 exports.getGames = async (req, res) => {
 
     const token = req.token.access_token;
     const io = req.io;
-  //
 
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    axios.defaults.headers.common['Client-ID'] =  config.client_id;
+    axios.defaults.headers.common['Client-ID'] = config.client_id;
 
-    // let games_array;
-    const url = encodeURI('https://api.twitch.tv/helix/games?name=Rainbow Six Siege&name=Far Cry 5&name=Assassin\'s Creed: Odyssey');
+    const url = constract_games_url();
     const games_array = (await axios.get(url)).data.data;
-    const counter_game = games_array.find(a => a.name === 'Tom Clancy\'s Rainbow Six Siege');
-
-    getCounter(token, counter_game, io).catch(err => {
+    getCounter(token, GAME_FOR_COUNTER, io).catch(err => {
         console.log('getCounter', err);
     });
     //
@@ -26,7 +34,7 @@ exports.getGames = async (req, res) => {
 }
 
 
- const getCounter = async (token, game_data, io)=> {
+const getCounter = async (token, game_data, io) => {
     let result = await getGameData('', token, 0, game_data);
     if (result && token) getCounter(token, game_data, io).catch(err => console.log(err));
     io.emit('getCounter', result);
@@ -61,12 +69,10 @@ const getCounterForChart = async (array_games, accessToken, io) => {
 
 const getGameData = async (newCursor, accessToken, counter, game_data) => {
 
-    const url = `https://api.twitch.tv/helix/streams?first=100&game_id=${game_data.id}&after=${newCursor}`;
+    const url = `${streams_url}&game_id=${game_data.id}&after=${newCursor}`;
     try {
-
         const response = await axios.get(url).catch(err => console.log('getGameData ERROR', err));
         counter += response.data.data.reduce((prev, cur) => prev + cur.viewer_count, 0);
-
         if (response && response.data.pagination.cursor) {
             return getGameData(response.data.pagination.cursor, accessToken, counter, game_data);
         }
